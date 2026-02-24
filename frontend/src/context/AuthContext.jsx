@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import api from '../services/api';
 import { TOKEN_KEY, USER_KEY } from '../services/authStorage';
@@ -19,6 +19,20 @@ export const AuthProvider = ({ children }) => {
             return null;
         }
     });
+    const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+    const normalizeUser = (rawUser) => {
+        if (!rawUser) {
+            return null;
+        }
+
+        return {
+            ...rawUser,
+            kullaniciAdi: rawUser.kullaniciAdi || rawUser.username || rawUser.email || '',
+            email: rawUser.email || '',
+            rol: rawUser.rol || ''
+        };
+    };
 
     useEffect(() => {
         if (token) {
@@ -47,7 +61,7 @@ export const AuthProvider = ({ children }) => {
             }
 
             setToken(nextToken);
-            setUser(nextUser);
+            setUser(normalizeUser(nextUser));
             return { success: true };
         } catch (error) {
             return { success: false, message: getErrorMessage(error, 'Giris basarisiz.') };
@@ -65,7 +79,7 @@ export const AuthProvider = ({ children }) => {
             }
 
             setToken(nextToken);
-            setUser(nextUser);
+            setUser(normalizeUser(nextUser));
             return { success: true };
         } catch (error) {
             return { success: false, message: getErrorMessage(error, 'Kayit basarisiz.') };
@@ -86,14 +100,50 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const fetchCurrentUser = useCallback(async (activeToken = token) => {
+        if (!activeToken) {
+            setUser(null);
+            return { success: false, message: 'Token bulunamadi.' };
+        }
+
+        setIsAuthLoading(true);
+        try {
+            const response = await api.get('/users/me', {
+                headers: { Authorization: `Bearer ${activeToken}` }
+            });
+            setUser(normalizeUser(response?.data));
+            return { success: true };
+        } catch (error) {
+            const status = error?.response?.status;
+            if (status === 401 || status === 403) {
+                setToken(null);
+                setUser(null);
+            }
+            return { success: false, message: getErrorMessage(error, 'Kullanici bilgisi alinamadi.') };
+        } finally {
+            setIsAuthLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        if (!token) {
+            setUser(null);
+            return;
+        }
+
+        fetchCurrentUser(token);
+    }, [token, fetchCurrentUser]);
+
     const value = {
         token,
         user,
+        isAuthLoading,
         isAuthenticated: Boolean(token),
         login,
         register,
         resetPassword,
-        logout
+        logout,
+        fetchCurrentUser
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

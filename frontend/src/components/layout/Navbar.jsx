@@ -8,7 +8,7 @@ const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
-    const { user, isAuthenticated, logout } = useAuth();
+    const { user, isAuthenticated, isAuthLoading, logout } = useAuth();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -49,7 +49,9 @@ const Navbar = () => {
                 </div>
 
                 <div className="navbar-actions desktop-only">
-                    {isAuthenticated ? (
+                    {isAuthLoading && isAuthenticated ? (
+                        <span className="navbar-user">Yukleniyor...</span>
+                    ) : isAuthenticated ? (
                         <>
                             <span className="navbar-user">{user?.kullaniciAdi || user?.email || 'Kullanici'}</span>
                             <button
@@ -91,7 +93,9 @@ const Navbar = () => {
                         </Link>
                     ))}
                     <div className="mobile-auth-actions">
-                        {isAuthenticated ? (
+                        {isAuthLoading && isAuthenticated ? (
+                            <div className="mobile-user-label">Yukleniyor...</div>
+                        ) : isAuthenticated ? (
                             <>
                                 <div className="mobile-user-label">{user?.kullaniciAdi || user?.email || 'Kullanici'}</div>
                                 <button
