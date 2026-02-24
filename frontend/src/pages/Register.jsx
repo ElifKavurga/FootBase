@@ -1,6 +1,7 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, UserPlus } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import './Auth.css';
 
 const Register = () => {
@@ -14,6 +15,7 @@ const Register = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { register } = useAuth();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,25 +27,28 @@ const Register = () => {
         setError('');
 
         if (formData.password !== formData.confirmPassword) {
-            setError('Şifreler eşleşmiyor!');
+            setError('Sifreler eslesmiyor.');
             setLoading(false);
             return;
         }
 
-        try {
-            // Placeholder logic for future API connection
-            // const response = await api.post('/auth/register', formData);
+        const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+        const username = fullName || formData.email.split('@')[0];
 
-            // Simulating API call
-            setTimeout(() => {
-                setLoading(false);
-                // simulate successful registration
-                navigate('/login');
-            }, 1000);
-        } catch (err) {
-            setError('Kayıt başarısız. Lütfen bilgilerinizi kontrol edin.');
-            setLoading(false);
+        const result = await register({
+            kullaniciAdi: username,
+            email: formData.email,
+            password: formData.password
+        });
+
+        setLoading(false);
+
+        if (result.success) {
+            navigate('/');
+            return;
         }
+
+        setError(result.message);
     };
 
     return (
@@ -53,8 +58,8 @@ const Register = () => {
                     <div className="auth-icon-wrapper mx-auto flex-center mb-3">
                         <UserPlus size={28} className="text-primary" />
                     </div>
-                    <h2>Hesap Oluştur</h2>
-                    <p className="text-muted">Aramıza katılın ve takımları yakından takip edin.</p>
+                    <h2>Hesap Olustur</h2>
+                    <p className="text-muted">Aramiza katilin ve takimlari yakindan takip edin.</p>
                 </div>
 
                 {error && <div className="error-banner mb-4">{error}</div>}
@@ -68,7 +73,7 @@ const Register = () => {
                                 <input
                                     type="text"
                                     name="firstName"
-                                    placeholder="Adınız"
+                                    placeholder="Adiniz"
                                     value={formData.firstName}
                                     onChange={handleChange}
                                     required
@@ -82,7 +87,7 @@ const Register = () => {
                                 <input
                                     type="text"
                                     name="lastName"
-                                    placeholder="Soyadınız"
+                                    placeholder="Soyadiniz"
                                     value={formData.lastName}
                                     onChange={handleChange}
                                     required
@@ -107,13 +112,13 @@ const Register = () => {
                     </div>
 
                     <div className="form-group mb-3">
-                        <label>Şifre</label>
+                        <label>Sifre</label>
                         <div className="input-wrapper">
                             <Lock size={18} className="input-icon" />
                             <input
                                 type="password"
                                 name="password"
-                                placeholder="••••••••"
+                                placeholder="********"
                                 value={formData.password}
                                 onChange={handleChange}
                                 required
@@ -123,13 +128,13 @@ const Register = () => {
                     </div>
 
                     <div className="form-group mb-4">
-                        <label>Şifre Tekrar</label>
+                        <label>Sifre Tekrar</label>
                         <div className="input-wrapper">
                             <Lock size={18} className="input-icon" />
                             <input
                                 type="password"
                                 name="confirmPassword"
-                                placeholder="••••••••"
+                                placeholder="********"
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
                                 required
@@ -139,14 +144,14 @@ const Register = () => {
                     </div>
 
                     <button type="submit" className="btn btn-primary w-100" disabled={loading}>
-                        {loading ? 'Kayıt Olunuyor...' : 'Ücretsiz Kayıt Ol'}
+                        {loading ? 'Kayit Olunuyor...' : 'Ucretsiz Kayit Ol'}
                     </button>
                 </form>
 
                 <div className="auth-footer text-center mt-4 pt-4">
                     <p className="text-muted text-sm">
-                        Zaten bir hesabınız var mı?{' '}
-                        <Link to="/login" className="text-primary font-bold">Giriş Yap</Link>
+                        Zaten bir hesabiniz var mi?{' '}
+                        <Link to="/login" className="text-primary font-bold">Giris Yap</Link>
                     </p>
                 </div>
             </div>
@@ -155,3 +160,4 @@ const Register = () => {
 };
 
 export default Register;
+

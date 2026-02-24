@@ -103,6 +103,18 @@
     gap: 1rem;
 }
 
+.navbar-user {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 0.4rem 0.75rem;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Mobile Responsiveness */
 .mobile-only {
     display: none;
@@ -169,6 +181,12 @@
     margin-top: 2rem;
     padding-top: 2rem;
     border-top: 1px solid var(--border-light);
+}
+
+.mobile-user-label {
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }
 
 @media (max-width: 768px) {

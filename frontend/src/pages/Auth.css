@@ -83,3 +83,21 @@
     font-size: 0.9rem;
     text-align: center;
 }
+
+.success-banner {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--primary-color);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.link-button {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+}
