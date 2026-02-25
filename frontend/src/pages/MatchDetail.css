@@ -50,6 +50,64 @@
     border-radius: 50%;
 }
 
+.comment-input {
+    width: 100%;
+    resize: vertical;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 0.9rem;
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+}
+
+.comment-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.comment-actions-row {
+    display: flex;
+    gap: 0.65rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.comment-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    transition: all var(--transition-fast);
+}
+
+.comment-action-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.comment-action-btn.liked {
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #ef4444;
+}
+
+.comment-action-btn.danger:hover {
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #ef4444;
+}
+
+.comment-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
     .scoreboard-body {
         flex-direction: column;

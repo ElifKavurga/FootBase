@@ -1,43 +1,104 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Filter } from 'lucide-react';
+import { Calendar, Filter, Image as ImageIcon } from 'lucide-react';
 import api from '../services/api';
 import './Matches.css';
 
+const normalizeStatus = (value) => (value || '')
+    .toString()
+    .toUpperCase()
+    .replaceAll('Ä°', 'I')
+    .replaceAll('İ', 'I')
+    .replaceAll('İ', 'I')
+    .replaceAll('Ü', 'U')
+    .replaceAll('Ö', 'O')
+    .replaceAll('Ş', 'S')
+    .replaceAll('Ç', 'C')
+    .replaceAll('Ğ', 'G');
+
+const getKickoffDate = (match) => {
+    if (!match?.tarih) {
+        return null;
+    }
+    const isoValue = `${match.tarih}T${match.saat || '00:00:00'}`;
+    const kickoff = new Date(isoValue);
+    return Number.isNaN(kickoff.getTime()) ? null : kickoff;
+};
+
+const isPastMatch = (match) => {
+    const status = normalizeStatus(match?.durum || match?.onayDurumu);
+    const explicitFinished = ['BITTI', 'TAMAMLANDI', 'SONUCLANDI', 'MAC_SONUCU'].includes(status);
+    if (explicitFinished) {
+        return true;
+    }
+
+    const explicitUpcoming = ['PLANLI', 'PLANLANDI', 'YAKINDA', 'ERTELENDI', 'ONAY_BEKLIYOR'].includes(status);
+    if (explicitUpcoming) {
+        return false;
+    }
+
+    const kickoff = getKickoffDate(match);
+    return kickoff ? kickoff <= new Date() : false;
+};
+
+const getDisplayStatus = (match) => {
+    const status = normalizeStatus(match?.durum || match?.onayDurumu);
+    if (status) {
+        return status;
+    }
+    return isPastMatch(match) ? 'BITTI' : 'PLANLI';
+};
+
 const Matches = () => {
     const [matches, setMatches] = useState([]);
+    const [matchPhotos, setMatchPhotos] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'past'
+    const [activeTab, setActiveTab] = useState('upcoming');
 
     useEffect(() => {
         const fetchMatches = async () => {
             try {
                 const response = await api.get('/matches');
+                const rawMatches = Array.isArray(response.data) ? response.data : [];
 
-                // MOCKING FOR TESTING: Planlı maçları Bitti yapalım ve skor atayalım
-                const mockedData = response.data.map(m => {
-                    if (m.durum === 'PLANLI' || !m.durum) {
-                        return {
-                            ...m,
-                            durum: 'BİTTİ',
-                            evSahibiSkor: m.evSahibiSkor !== null ? m.evSahibiSkor : Math.floor(Math.random() * 4),
-                            deplasmanSkor: m.deplasmanSkor !== null ? m.deplasmanSkor : Math.floor(Math.random() * 3)
-                        };
+                const sortedMatches = [...rawMatches].sort((a, b) => {
+                    const dateA = getKickoffDate(a);
+                    const dateB = getKickoffDate(b);
+                    if (!dateA && !dateB) {
+                        return 0;
                     }
-                    return m;
+                    if (!dateA) {
+                        return 1;
+                    }
+                    if (!dateB) {
+                        return -1;
+                    }
+                    return dateB - dateA;
                 });
 
-                // Sort matches by date
-                const sorted = mockedData.sort((a, b) => {
-                    if (!a.tarih) return 1;
-                    if (!b.tarih) return -1;
-                    return new Date(b.tarih) - new Date(a.tarih);
-                });
-                setMatches(sorted);
+                setMatches(sortedMatches);
+
+                const photoEntries = await Promise.all(
+                    sortedMatches.map(async (match) => {
+                        try {
+                            const mediaRes = await api.get(`/matches/${match.id}/media`);
+                            const mediaList = Array.isArray(mediaRes.data) ? mediaRes.data : [];
+                            const firstPhoto = mediaList.find((item) => {
+                                const tip = normalizeStatus(item?.tip);
+                                return !tip || tip.includes('FOTO') || tip.includes('IMAGE');
+                            });
+                            return [match.id, firstPhoto?.url || null];
+                        } catch {
+                            return [match.id, null];
+                        }
+                    })
+                );
+
+                setMatchPhotos(Object.fromEntries(photoEntries));
             } catch (err) {
-                console.error('Maçları çekerken hata:', err);
-                setError('Maçlar yüklenirken bir sorun oluştu.');
+                console.error('Maclari cekerken hata:', err);
+                setError('Maclar yuklenirken bir sorun olustu.');
             } finally {
                 setLoading(false);
             }
@@ -46,12 +107,23 @@ const Matches = () => {
         fetchMatches();
     }, []);
 
-    // Oynanan (canlı) ve bitmiş maçları "pastMatches", sadece planlananları "upcomingMatches" listesine koyuyoruz
-    const upcomingMatches = matches.filter(m =>
-        m.durum === 'PLANLI' || m.durum === 'ERTELENDİ' || m.durum === 'YAKINDA' || (!m.durum && m.evSahibiSkor === null)
-    );
+    const { upcomingMatches, pastMatches } = useMemo(() => {
+        const upcoming = [];
+        const past = [];
 
-    const pastMatches = matches.filter(m => !upcomingMatches.includes(m));
+        matches.forEach((match) => {
+            if (isPastMatch(match)) {
+                past.push(match);
+            } else {
+                upcoming.push(match);
+            }
+        });
+
+        return {
+            upcomingMatches: upcoming,
+            pastMatches: past
+        };
+    }, [matches]);
 
     const displayMatches = activeTab === 'upcoming' ? upcomingMatches : pastMatches;
 
@@ -67,8 +139,8 @@ const Matches = () => {
         <div className="matches-page container animate-fade-in">
             <div className="page-header flex-between flex-wrap gap-4">
                 <div>
-                    <h1 className="page-title text-gradient">Fikstür ve Maçlar</h1>
-                    <p className="text-muted">Ligdeki tüm heyecan verici karşılaşmalar</p>
+                    <h1 className="page-title text-gradient">Fikstur ve Maclar</h1>
+                    <p className="text-muted">Ligdeki tum karsilasmalar</p>
                 </div>
             </div>
 
@@ -81,27 +153,37 @@ const Matches = () => {
                             className={`match-tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
                             onClick={() => setActiveTab('upcoming')}
                         >
-                            Gelecek Maçlar ({upcomingMatches.length})
+                            Gelecek Maclar ({upcomingMatches.length})
                         </button>
                         <button
                             className={`match-tab-btn ${activeTab === 'past' ? 'active' : ''}`}
                             onClick={() => setActiveTab('past')}
                         >
-                            Oynanan & Tamamlanan ({pastMatches.length})
+                            Oynanan ve Tamamlanan ({pastMatches.length})
                         </button>
                     </div>
 
                     <div className="matches-list grid gap-4 animate-slide-up">
                         {displayMatches.length > 0 ? (
-                            displayMatches.map(match => (
+                            displayMatches.map((match) => (
                                 <Link to={`/matches/${match.id}`} key={match.id} className="match-list-card glass-panel flex-between flex-wrap hover-scale">
                                     <div className="match-list-time flex-center flex-column">
                                         <Calendar size={18} className="text-primary mb-1" />
                                         <span className="font-bold">{match.tarih || 'Tarih Belirsiz'}</span>
                                         <span className="text-muted text-sm">{match.saat || ''}</span>
                                         <span className={`badge mt-2 ${activeTab === 'past' ? 'badge-success' : 'badge-warning'}`}>
-                                            {match.durum || (activeTab === 'past' ? 'BİTTİ' : 'PLANLI')}
+                                            {getDisplayStatus(match)}
                                         </span>
+                                    </div>
+
+                                    <div className="match-photo-box">
+                                        {matchPhotos[match.id] ? (
+                                            <img src={matchPhotos[match.id]} alt="Mac fotografi" className="match-photo" />
+                                        ) : (
+                                            <div className="match-photo-placeholder">
+                                                <ImageIcon size={20} />
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="match-list-teams flex-1 flex-center w-100">
@@ -113,11 +195,9 @@ const Matches = () => {
                                         </div>
 
                                         <div className="score-box glass-panel px-4 py-2 mx-4 flex-center font-bold text-2xl" style={{ minWidth: '100px' }}>
-                                            {activeTab === 'past' ? (
-                                                `${match.evSahibiSkor !== null ? match.evSahibiSkor : '0'} - ${match.deplasmanSkor !== null ? match.deplasmanSkor : '0'}`
-                                            ) : (
-                                                'VS'
-                                            )}
+                                            {activeTab === 'past'
+                                                ? `${match.evSahibiSkor ?? 0} - ${match.deplasmanSkor ?? 0}`
+                                                : 'VS'}
                                         </div>
 
                                         <div className="team away pl-4 w-50 flex-center" style={{ justifyContent: 'flex-start', gap: '1rem' }}>
@@ -132,8 +212,8 @@ const Matches = () => {
                         ) : (
                             <div className="empty-state glass-panel text-center py-5 w-100">
                                 <Filter size={48} className="text-muted mb-4" />
-                                <h3>Maç Bulunamadı</h3>
-                                <p className="text-muted">Bu kategoride gösterilecek maç bulunmuyor.</p>
+                                <h3>Mac Bulunamadi</h3>
+                                <p className="text-muted">Bu kategoride gosterilecek mac bulunmuyor.</p>
                             </div>
                         )}
                     </div>
