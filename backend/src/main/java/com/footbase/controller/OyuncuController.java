@@ -1,18 +1,18 @@
 package com.footbase.controller;
 
 import com.footbase.entity.Oyuncu;
+import com.footbase.entity.OyuncuYorumlari;
 import com.footbase.repository.KullaniciRepository;
 import com.footbase.repository.MacOyuncuOlaylariRepository;
 import com.footbase.repository.OyuncuMedyaRepository;
-import com.footbase.repository.OyuncuPuanlariRepository;
 import com.footbase.repository.OyuncuYorumlariRepository;
 import com.footbase.security.JwtUtil;
 import com.footbase.service.OyuncuService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +36,6 @@ public class OyuncuController {
 
     @Autowired
     private MacOyuncuOlaylariRepository macOyuncuOlaylariRepository;
-
-    @Autowired
-    private OyuncuPuanlariRepository oyuncuPuanlariRepository;
 
     @Autowired
     private OyuncuYorumlariRepository oyuncuYorumlariRepository;
@@ -98,10 +95,8 @@ public class OyuncuController {
     @GetMapping("/{id}/score")
     public ResponseEntity<?> oyuncuPuaniniGetir(@PathVariable Long id) {
         try {
-            return oyuncuPuanlariRepository.findByOyuncuIdWithDetails(id)
-                    .map(puan -> ResponseEntity.ok((Object) puan))
-                    .orElse(ResponseEntity.ok((Object) Map.of("puan", 0.0)));
-        } catch (Exception e) {
+            return ResponseEntity.ok(oyuncuService.oyuncuSkorunuGetir(id));
+        } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
         }
     }
@@ -126,50 +121,92 @@ public class OyuncuController {
 
     @PostMapping("/{id}/ratings")
     public ResponseEntity<?> oyuncuPuanla(@PathVariable Long id, @RequestBody Map<String, Object> puanlamaBilgileri,
-            HttpServletRequest request) {
+                                          HttpServletRequest request) {
         try {
-            // Kullanıcı ID'sini JWT token'dan al
-            Long kullaniciId = null;
-            try {
-                String authHeader = request.getHeader("Authorization");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    String token = authHeader.substring(7);
-                    String email = jwtUtil.getKullaniciEmailFromToken(token);
-                    kullaniciId = kullaniciRepository.findByEmail(email)
-                            .map(k -> k.getId())
-                            .orElse(null);
-                }
-            } catch (Exception e) {
-                // Token yoksa veya geçersizse devam et
-            }
-
-            // Kullanıcı ID'si yoksa hata döndür
+            Long kullaniciId = getKullaniciIdFromRequest(request);
             if (kullaniciId == null) {
-                return ResponseEntity.badRequest().body(Map.of("hata", "Giriş yapmanız gerekiyor"));
+                return ResponseEntity.badRequest().body(Map.of("hata", "Giris yapmaniz gerekiyor"));
             }
 
-            Integer score = null;
-            if (puanlamaBilgileri.containsKey("score")) {
-                Object scoreObj = puanlamaBilgileri.get("score");
-                if (scoreObj instanceof Number) {
-                    score = ((Number) scoreObj).intValue();
-                }
-            }
-
+            Integer score = parseScore(puanlamaBilgileri.get("score"));
             String comment = (String) puanlamaBilgileri.getOrDefault("comment", "");
 
-            com.footbase.entity.OyuncuYorumlari yorum = oyuncuService.oyuncuYorumEkle(id, kullaniciId, score, comment);
+            OyuncuYorumlari yorum = oyuncuService.oyuncuYorumEkle(id, kullaniciId, score, comment);
 
-            // Map formatında döndür
-            Map<String, Object> result = new java.util.HashMap<>();
+            Map<String, Object> result = new HashMap<>();
             result.put("id", yorum.getId());
             result.put("comment", yorum.getIcerik());
             result.put("icerik", yorum.getIcerik());
+            result.put("score", score);
             result.put("olusturmaTarihi", yorum.getOlusturmaTarihi());
-
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
         }
+    }
+
+    @PutMapping("/{id}/ratings/{ratingId}")
+    public ResponseEntity<?> oyuncuPuaniniGuncelle(@PathVariable Long id,
+                                                    @PathVariable Long ratingId,
+                                                    @RequestBody Map<String, Object> puanlamaBilgileri,
+                                                    HttpServletRequest request) {
+        try {
+            Long kullaniciId = getKullaniciIdFromRequest(request);
+            if (kullaniciId == null) {
+                return ResponseEntity.badRequest().body(Map.of("hata", "Giris yapmaniz gerekiyor"));
+            }
+
+            Integer score = parseScore(puanlamaBilgileri.get("score"));
+            String comment = (String) puanlamaBilgileri.getOrDefault("comment", "");
+
+            OyuncuYorumlari yorum = oyuncuService.oyuncuYorumGuncelle(id, ratingId, kullaniciId, score, comment);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", yorum.getId());
+            result.put("comment", yorum.getIcerik());
+            result.put("icerik", yorum.getIcerik());
+            result.put("score", score);
+            result.put("olusturmaTarihi", yorum.getOlusturmaTarihi());
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/ratings/{ratingId}")
+    public ResponseEntity<?> oyuncuPuaniniSil(@PathVariable Long id,
+                                               @PathVariable Long ratingId,
+                                               HttpServletRequest request) {
+        try {
+            Long kullaniciId = getKullaniciIdFromRequest(request);
+            if (kullaniciId == null) {
+                return ResponseEntity.badRequest().body(Map.of("hata", "Giris yapmaniz gerekiyor"));
+            }
+
+            oyuncuService.oyuncuYorumSil(id, ratingId, kullaniciId);
+            return ResponseEntity.ok(Map.of("mesaj", "Degerlendirme silindi"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
+        }
+    }
+
+    private Long getKullaniciIdFromRequest(HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                String email = jwtUtil.getKullaniciEmailFromToken(token);
+                return kullaniciRepository.findByEmail(email).map(k -> k.getId()).orElse(null);
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private Integer parseScore(Object scoreObj) {
+        if (scoreObj instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
     }
 }

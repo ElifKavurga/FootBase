@@ -25,32 +25,30 @@ public class YorumService {
     private KullaniciRepository kullaniciRepository;
 
     public List<Yorum> macYorumlariniGetir(Long macId) {
-        return yorumRepository.findByMacOrderByYorumTarihiDesc(
-                macRepository.findById(macId)
-                        .orElseThrow(() -> new RuntimeException("Maç bulunamadı")));
+        Mac mac = macRepository.findById(macId)
+                .orElseThrow(() -> new RuntimeException("Mac bulunamadi"));
+        return yorumRepository.findByMacOrderByYorumTarihiDesc(mac);
     }
 
     public Yorum yorumOlustur(Long macId, Long kullaniciId, String mesaj) {
         Mac mac = macRepository.findById(macId)
-                .orElseThrow(() -> new RuntimeException("Maç bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Mac bulunamadi"));
         Kullanici kullanici = kullaniciRepository.findById(kullaniciId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
 
         Yorum yorum = new Yorum();
         yorum.setMac(mac);
         yorum.setKullanici(kullanici);
         yorum.setMesaj(mesaj);
-
         return yorumRepository.save(yorum);
     }
 
     public Yorum yorumGuncelle(Long yorumId, Long kullaniciId, String mesaj) {
         Yorum yorum = yorumRepository.findById(yorumId)
-                .orElseThrow(() -> new RuntimeException("Yorum bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadi"));
 
-        // Yorum sahibi kontrolü
         if (!yorum.getKullanici().getId().equals(kullaniciId)) {
-            throw new RuntimeException("Bu yorumu güncelleme yetkiniz yok");
+            throw new RuntimeException("Bu yorumu guncelleme yetkiniz yok");
         }
 
         yorum.setMesaj(mesaj);
@@ -59,9 +57,8 @@ public class YorumService {
 
     public void yorumSil(Long yorumId, Long kullaniciId) {
         Yorum yorum = yorumRepository.findById(yorumId)
-                .orElseThrow(() -> new RuntimeException("Yorum bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadi"));
 
-        // Yorum sahibi kontrolü
         if (!yorum.getKullanici().getId().equals(kullaniciId)) {
             throw new RuntimeException("Bu yorumu silme yetkiniz yok");
         }
@@ -70,24 +67,20 @@ public class YorumService {
     }
 
     public boolean yorumBegen(Long yorumId, Long kullaniciId) {
-        Yorum yorum = yorumRepository.findById(yorumId)
-                .orElseThrow(() -> new RuntimeException("Yorum bulunamadı"));
+        Yorum yorum = yorumRepository.findByIdWithLikes(yorumId)
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadi"));
         Kullanici kullanici = kullaniciRepository.findById(kullaniciId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
 
-        // Beğeni durumunu kontrol et
         boolean begenildi = yorum.getBegenenKullanicilar().contains(kullanici);
-
         if (begenildi) {
-            // Beğeniyi kaldır
             yorum.getBegenenKullanicilar().remove(kullanici);
         } else {
-            // Beğen
             yorum.getBegenenKullanicilar().add(kullanici);
         }
 
         yorumRepository.save(yorum);
-        return !begenildi; // Yeni durum
+        return !begenildi;
     }
 
     public List<Yorum> sonYorumlariGetir(int limit) {

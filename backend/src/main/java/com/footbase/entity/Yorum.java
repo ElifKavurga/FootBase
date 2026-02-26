@@ -3,8 +3,8 @@ package com.footbase.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "yorumlar")
@@ -32,8 +32,10 @@ public class Yorum {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mac_id", nullable = false)
     private Mac mac;
-    @Transient
-    private List<Kullanici> begenenKullanicilar = new ArrayList<>();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "yorum_begenileri", joinColumns = @JoinColumn(name = "yorum_id"), inverseJoinColumns = @JoinColumn(name = "kullanici_id", referencedColumnName = "kullanici_id"))
+    private Set<Kullanici> begenenKullanicilar = new HashSet<>();
 
     public Yorum() {
         this.yorumTarihi = LocalDateTime.now();
@@ -79,11 +81,11 @@ public class Yorum {
         this.mac = mac;
     }
 
-    public List<Kullanici> getBegenenKullanicilar() {
+    public Set<Kullanici> getBegenenKullanicilar() {
         return begenenKullanicilar;
     }
 
-    public void setBegenenKullanicilar(List<Kullanici> begenenKullanicilar) {
+    public void setBegenenKullanicilar(Set<Kullanici> begenenKullanicilar) {
         this.begenenKullanicilar = begenenKullanicilar;
     }
 

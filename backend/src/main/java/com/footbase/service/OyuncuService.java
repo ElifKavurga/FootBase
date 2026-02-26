@@ -2,18 +2,23 @@ package com.footbase.service;
 
 import com.footbase.entity.Kullanici;
 import com.footbase.entity.Oyuncu;
+import com.footbase.entity.OyuncuPuanlari;
 import com.footbase.entity.OyuncuYorumlari;
 import com.footbase.entity.Takim;
 import com.footbase.repository.KullaniciRepository;
+import com.footbase.repository.OyuncuPuanlariRepository;
 import com.footbase.repository.OyuncuRepository;
 import com.footbase.repository.OyuncuYorumlariRepository;
 import com.footbase.repository.TakimRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +34,9 @@ public class OyuncuService {
     private OyuncuYorumlariRepository oyuncuYorumlariRepository;
 
     @Autowired
+    private OyuncuPuanlariRepository oyuncuPuanlariRepository;
+
+    @Autowired
     private KullaniciRepository kullaniciRepository;
 
     public List<Oyuncu> tumOyunculariGetir() {
@@ -37,56 +45,37 @@ public class OyuncuService {
 
     public Oyuncu oyuncuGetir(Long id) {
         return oyuncuRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Oyuncu bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Oyuncu bulunamadi"));
     }
 
     public Map<String, Object> oyuncuDetaylariniGetir(Long id) {
         Oyuncu oyuncu = oyuncuGetir(id);
-        List<OyuncuYorumlari> yorumlar = oyuncuYorumlariRepository.findByOyuncuIdOrderByOlusturmaTarihiDesc(id);
+        Map<String, Object> skorOzeti = oyuncuSkorunuGetir(id);
+        double ortalamaPuan = (double) skorOzeti.get("score");
+        int puanSayisi = (int) skorOzeti.get("ratingCount");
 
-        // Ortalama puanı hesapla
-        List<Double> puanlar = new java.util.ArrayList<>();
-        for (OyuncuYorumlari yorum : yorumlar) {
-            String icerik = yorum.getIcerik();
-            if (icerik != null && icerik.startsWith("[") && icerik.contains("/10]")) {
-                try {
-                    String puanStr = icerik.substring(1, icerik.indexOf("/10]"));
-                    double puan = Double.parseDouble(puanStr);
-                    puanlar.add(puan);
-                } catch (Exception e) {
-                    // Hata olursa atla
-                }
-            }
-        }
-
-        double ortalamaPuan = 0.0;
-        if (!puanlar.isEmpty()) {
-            ortalamaPuan = puanlar.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-        }
-
-        // Map formatında döndür (hem backend hem frontend field adlarını destekle)
         Map<String, Object> detay = new HashMap<>();
         detay.put("id", oyuncu.getId());
         detay.put("ad", oyuncu.getAd());
         detay.put("soyad", oyuncu.getSoyad());
-        detay.put("fullName", oyuncu.getAd() + " " + oyuncu.getSoyad()); // Frontend için
+        detay.put("fullName", oyuncu.getAd() + " " + oyuncu.getSoyad());
         detay.put("pozisyon", oyuncu.getPozisyon());
-        detay.put("position", oyuncu.getPozisyon()); // Frontend için
+        detay.put("position", oyuncu.getPozisyon());
         detay.put("dogumTarihi", oyuncu.getDogumTarihi());
         detay.put("milliyet", oyuncu.getMilliyet());
         detay.put("fotograf", oyuncu.getFotograf());
-        detay.put("imageUrl", oyuncu.getFotograf()); // Frontend için
+        detay.put("imageUrl", oyuncu.getFotograf());
         detay.put("averageRating", ortalamaPuan);
-        detay.put("ratingCount", puanlar.size());
+        detay.put("ortalamaPuan", ortalamaPuan);
+        detay.put("ratingCount", puanSayisi);
 
-        // Takım bilgisi varsa ekle
         if (oyuncu.getTakim() != null) {
             Map<String, Object> takimMap = new HashMap<>();
             takimMap.put("id", oyuncu.getTakim().getId());
             takimMap.put("ad", oyuncu.getTakim().getAd());
             takimMap.put("logo", oyuncu.getTakim().getLogo());
             detay.put("takim", takimMap);
-            detay.put("team", oyuncu.getTakim().getAd()); // Frontend için
+            detay.put("team", oyuncu.getTakim().getAd());
         }
 
         return detay;
@@ -101,10 +90,9 @@ public class OyuncuService {
     }
 
     public Oyuncu oyuncuOlustur(Oyuncu oyuncu) {
-        // Takımı kontrol et
         if (oyuncu.getTakim() != null && oyuncu.getTakim().getId() != null) {
             Takim takim = takimRepository.findById(oyuncu.getTakim().getId())
-                    .orElseThrow(() -> new RuntimeException("Takım bulunamadı"));
+                    .orElseThrow(() -> new RuntimeException("Takim bulunamadi"));
             oyuncu.setTakim(takim);
         }
 
@@ -123,7 +111,6 @@ public class OyuncuService {
         if (oyuncu.getPozisyon() != null) {
             mevcutOyuncu.setPozisyon(oyuncu.getPozisyon());
         }
-
         if (oyuncu.getDogumTarihi() != null) {
             mevcutOyuncu.setDogumTarihi(oyuncu.getDogumTarihi());
         }
@@ -135,7 +122,7 @@ public class OyuncuService {
         }
         if (oyuncu.getTakim() != null && oyuncu.getTakim().getId() != null) {
             Takim takim = takimRepository.findById(oyuncu.getTakim().getId())
-                    .orElseThrow(() -> new RuntimeException("Takım bulunamadı"));
+                    .orElseThrow(() -> new RuntimeException("Takim bulunamadi"));
             mevcutOyuncu.setTakim(takim);
         }
 
@@ -148,25 +135,16 @@ public class OyuncuService {
     }
 
     public List<Map<String, Object>> oyuncuYorumlariniGetir(Long oyuncuId) {
+        oyuncuGetir(oyuncuId);
         List<OyuncuYorumlari> yorumlar = oyuncuYorumlariRepository.findByOyuncuIdOrderByOlusturmaTarihiDesc(oyuncuId);
         return yorumlar.stream().map(yorum -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", yorum.getId());
             map.put("comment", yorum.getIcerik());
             map.put("icerik", yorum.getIcerik());
-            // Yorum içeriğinden puan bilgisini çıkarmaya çalış
-            String icerik = yorum.getIcerik();
-            if (icerik != null && icerik.startsWith("[") && icerik.contains("/10]")) {
-                try {
-                    String puanStr = icerik.substring(1, icerik.indexOf("/10]"));
-                    map.put("score", Double.parseDouble(puanStr));
-                } catch (Exception e) {
-                    map.put("score", null);
-                }
-            } else {
-                map.put("score", null);
-            }
+            map.put("score", puanCikar(yorum.getIcerik()));
             map.put("author", yorum.getKullanici() != null ? yorum.getKullanici().getKullaniciAdi() : null);
+            map.put("kullaniciId", yorum.getKullanici() != null ? yorum.getKullanici().getId() : null);
             map.put("olusturmaTarihi", yorum.getOlusturmaTarihi());
             return map;
         }).collect(Collectors.toList());
@@ -175,16 +153,15 @@ public class OyuncuService {
     public OyuncuYorumlari oyuncuYorumEkle(Long oyuncuId, Long kullaniciId, Integer score, String comment) {
         Oyuncu oyuncu = oyuncuGetir(oyuncuId);
         Kullanici kullanici = kullaniciRepository.findById(kullaniciId)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
 
-        // Yorum içeriğini oluştur - puan varsa başa ekle
-        String icerik = comment != null && !comment.trim().isEmpty() ? comment.trim() : "";
-        if (score != null && score >= 1 && score <= 10) {
-            icerik = String.format("[%d/10] %s", score, icerik).trim();
+        if (score != null && (score < 1 || score > 10)) {
+            throw new RuntimeException("Puan 1-10 arasinda olmali");
         }
 
+        String icerik = formatDegerlendirmeIcerigi(score, comment);
         if (icerik.isEmpty()) {
-            throw new RuntimeException("Yorum içeriği gereklidir");
+            throw new RuntimeException("Yorum icerigi gereklidir");
         }
 
         OyuncuYorumlari yorum = new OyuncuYorumlari();
@@ -192,6 +169,104 @@ public class OyuncuService {
         yorum.setKullanici(kullanici);
         yorum.setIcerik(icerik);
 
-        return oyuncuYorumlariRepository.save(yorum);
+        OyuncuYorumlari kaydedilen = oyuncuYorumlariRepository.save(yorum);
+        oyuncuPuaniYenile(oyuncuId);
+        return kaydedilen;
+    }
+
+    public OyuncuYorumlari oyuncuYorumGuncelle(Long oyuncuId, Long yorumId, Long kullaniciId, Integer score, String comment) {
+        oyuncuGetir(oyuncuId);
+        OyuncuYorumlari yorum = oyuncuYorumlariRepository.findById(yorumId)
+                .orElseThrow(() -> new RuntimeException("Degerlendirme bulunamadi"));
+
+        if (!yorum.getOyuncu().getId().equals(oyuncuId)) {
+            throw new RuntimeException("Degerlendirme bu oyuncuya ait degil");
+        }
+        if (!yorum.getKullanici().getId().equals(kullaniciId)) {
+            throw new RuntimeException("Bu degerlendirmeyi guncelleme yetkiniz yok");
+        }
+        if (score != null && (score < 1 || score > 10)) {
+            throw new RuntimeException("Puan 1-10 arasinda olmali");
+        }
+
+        String icerik = formatDegerlendirmeIcerigi(score, comment);
+        if (icerik.isEmpty()) {
+            throw new RuntimeException("Yorum icerigi gereklidir");
+        }
+
+        yorum.setIcerik(icerik);
+        OyuncuYorumlari kaydedilen = oyuncuYorumlariRepository.save(yorum);
+        oyuncuPuaniYenile(oyuncuId);
+        return kaydedilen;
+    }
+
+    public void oyuncuYorumSil(Long oyuncuId, Long yorumId, Long kullaniciId) {
+        oyuncuGetir(oyuncuId);
+        OyuncuYorumlari yorum = oyuncuYorumlariRepository.findById(yorumId)
+                .orElseThrow(() -> new RuntimeException("Degerlendirme bulunamadi"));
+
+        if (!yorum.getOyuncu().getId().equals(oyuncuId)) {
+            throw new RuntimeException("Degerlendirme bu oyuncuya ait degil");
+        }
+        if (!yorum.getKullanici().getId().equals(kullaniciId)) {
+            throw new RuntimeException("Bu degerlendirmeyi silme yetkiniz yok");
+        }
+
+        oyuncuYorumlariRepository.delete(yorum);
+        oyuncuPuaniYenile(oyuncuId);
+    }
+
+    public Map<String, Object> oyuncuSkorunuGetir(Long oyuncuId) {
+        oyuncuGetir(oyuncuId);
+        List<OyuncuYorumlari> yorumlar = oyuncuYorumlariRepository.findByOyuncuIdOrderByOlusturmaTarihiDesc(oyuncuId);
+
+        List<Integer> puanlar = yorumlar.stream()
+                .map(yorum -> puanCikar(yorum.getIcerik()))
+                .filter(Objects::nonNull)
+                .map(Double::intValue)
+                .collect(Collectors.toList());
+
+        double ortalama = puanlar.stream().mapToInt(Integer::intValue).average().orElse(0.0);
+
+        Map<String, Object> sonuc = new HashMap<>();
+        sonuc.put("oyuncuId", oyuncuId);
+        sonuc.put("score", ortalama);
+        sonuc.put("puan", ortalama);
+        sonuc.put("ratingCount", puanlar.size());
+        return sonuc;
+    }
+
+    private String formatDegerlendirmeIcerigi(Integer score, String comment) {
+        String temizYorum = comment != null ? comment.trim() : "";
+        if (score != null) {
+            return String.format("[%d/10] %s", score, temizYorum).trim();
+        }
+        return temizYorum;
+    }
+
+    private Double puanCikar(String icerik) {
+        if (icerik == null || !icerik.startsWith("[") || !icerik.contains("/10]")) {
+            return null;
+        }
+        try {
+            String puanStr = icerik.substring(1, icerik.indexOf("/10]"));
+            return Double.parseDouble(puanStr);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void oyuncuPuaniYenile(Long oyuncuId) {
+        Map<String, Object> skorOzeti = oyuncuSkorunuGetir(oyuncuId);
+        double score = (double) skorOzeti.get("score");
+
+        OyuncuPuanlari oyuncuPuani = oyuncuPuanlariRepository.findByOyuncuId(oyuncuId).orElseGet(() -> {
+            OyuncuPuanlari yeni = new OyuncuPuanlari();
+            yeni.setOyuncuId(oyuncuId);
+            return yeni;
+        });
+
+        oyuncuPuani.setPuan(BigDecimal.valueOf(score).setScale(2, RoundingMode.HALF_UP));
+        oyuncuPuanlariRepository.save(oyuncuPuani);
     }
 }

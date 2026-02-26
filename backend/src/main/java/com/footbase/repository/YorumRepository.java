@@ -34,4 +34,7 @@ public interface YorumRepository extends JpaRepository<Yorum, Long> {
                      "WHERE y.kullanici = :kullanici " +
                      "ORDER BY y.yorumTarihi DESC")
        List<Yorum> findByKullaniciOrderByYorumTarihiDesc(Kullanici kullanici);
+
+       @Query("SELECT y FROM Yorum y LEFT JOIN FETCH y.begenenKullanicilar WHERE y.id = :yorumId")
+       java.util.Optional<Yorum> findByIdWithLikes(Long yorumId);
 }
