@@ -115,6 +115,39 @@
     text-overflow: ellipsis;
 }
 
+.notification-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+}
+
+.notification-link:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: rgba(16, 185, 129, 0.07);
+}
+
+.notification-badge {
+    min-width: 1.1rem;
+    height: 1.1rem;
+    padding: 0 0.2rem;
+    border-radius: var(--radius-full);
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
 /* Mobile Responsiveness */
 .mobile-only {
     display: none;

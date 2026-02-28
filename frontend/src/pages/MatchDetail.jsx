@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Trophy, Activity, MessageSquare, Flame, Heart, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Trophy, Activity, MessageSquare, Flame, Heart, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import './MatchDetail.css';
@@ -13,11 +13,27 @@ const normalizeComment = (comment) => ({
     userId: comment?.kullanici?.id || comment?.kullaniciId || null
 });
 
+const normalizeMedia = (item) => ({
+    id: item?.id,
+    url: item?.url || '',
+    tip: (item?.tip || '').toUpperCase()
+});
+
+const isImageMedia = (tip = '', url = '') => {
+    const t = tip.toUpperCase();
+    if (t.includes('IMAGE') || t.includes('FOTO')) {
+        return true;
+    }
+    return /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
+};
+
 const MatchDetail = () => {
     const { id } = useParams();
     const { user, isAuthenticated } = useAuth();
     const [match, setMatch] = useState(null);
     const [events, setEvents] = useState([]);
+    const [matchMedia, setMatchMedia] = useState([]);
+    const [matchStats, setMatchStats] = useState({ gol: 0, sariKart: 0, kirmiziKart: 0, toplamOlay: 0 });
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -37,37 +53,49 @@ const MatchDetail = () => {
         setComments(normalized);
     }, [id]);
 
+    const calculateStats = (eventList) => {
+        const next = { gol: 0, sariKart: 0, kirmiziKart: 0, toplamOlay: eventList.length };
+        for (const event of eventList) {
+            if (event?.olayTuru === 'GOL') {
+                next.gol += 1;
+            } else if (event?.olayTuru === 'SARI_KART') {
+                next.sariKart += 1;
+            } else if (event?.olayTuru === 'KIRMIZI_KART') {
+                next.kirmiziKart += 1;
+            }
+        }
+        setMatchStats(next);
+    };
+
     useEffect(() => {
         const fetchMatchDetails = async () => {
             setLoading(true);
             try {
-                const [matchRes, eventsRes] = await Promise.all([
-                    api.get(`/matches/${id}`),
-                    api.get(`/matches/${id}/events`).catch(() => ({ data: [] }))
-                ]);
+                const detayliRes = await api.get(`/matches/${id}/detayli`).catch(() => ({ data: null }));
 
-                let matchData = matchRes.data;
-                if (matchData.durum === 'PLANLI' || !matchData.durum) {
-                    matchData = {
-                        ...matchData,
-                        durum: 'BITTI',
-                        evSahibiSkor: matchData.evSahibiSkor !== null ? matchData.evSahibiSkor : 2,
-                        deplasmanSkor: matchData.deplasmanSkor !== null ? matchData.deplasmanSkor : 1
-                    };
+                if (detayliRes?.data?.mac) {
+                    const detay = detayliRes.data;
+                    const detayEvents = detay?.olaylar || [];
+                    const detayMedia = detay?.medya || [];
+
+                    setMatch(detay.mac);
+                    setEvents(detayEvents);
+                    setMatchMedia(detayMedia.map(normalizeMedia));
+                    calculateStats(detayEvents);
+                } else {
+                    const [matchRes, eventsRes, mediaRes] = await Promise.all([
+                        api.get(`/matches/${id}`),
+                        api.get(`/matches/${id}/events`).catch(() => ({ data: [] })),
+                        api.get(`/matches/${id}/media`).catch(() => ({ data: [] }))
+                    ]);
+
+                    const fallbackEvents = eventsRes.data || [];
+                    setMatch(matchRes.data);
+                    setEvents(fallbackEvents);
+                    setMatchMedia((mediaRes.data || []).map(normalizeMedia));
+                    calculateStats(fallbackEvents);
                 }
 
-                let matchEvents = eventsRes.data || [];
-                if (matchEvents.length === 0 && matchData.durum === 'BITTI') {
-                    matchEvents = [
-                        { dakika: 12, olayTuru: 'GOL', takimId: matchData.evSahibiTakim?.id, aciklama: 'Harika bir sutla top aglarda!' },
-                        { dakika: 34, olayTuru: 'SARI_KART', takimId: matchData.deplasmanTakim?.id, aciklama: 'Sert mudahale sonrasi sari kart.' },
-                        { dakika: 67, olayTuru: 'GOL', takimId: matchData.evSahibiTakim?.id, aciklama: 'Kafa vurusu ile gelen gol!' },
-                        { dakika: 89, olayTuru: 'GOL', takimId: matchData.deplasmanTakim?.id, aciklama: 'Ceza sahasi disindan guzel gol.' }
-                    ];
-                }
-
-                setMatch(matchData);
-                setEvents(matchEvents);
                 await loadComments();
             } catch (err) {
                 console.error('Mac detaylari cekilirken hata:', err);
@@ -217,7 +245,7 @@ const MatchDetail = () => {
                     <div className="score-container flex-center flex-column mx-4">
                         {isFinished ? (
                             <div className="score-display text-gradient font-bold" style={{ fontSize: '4rem', lineHeight: 1 }}>
-                                {match.evSahibiSkor} - {match.deplasmanSkor}
+                                {match.evSahibiSkor ?? '-'} - {match.deplasmanSkor ?? '-'}
                             </div>
                         ) : (
                             <div className="vs-display font-bold text-muted" style={{ fontSize: '3rem' }}>VS</div>
@@ -247,6 +275,12 @@ const MatchDetail = () => {
                         <Activity size={18} /> Mac Ozeti
                     </button>
                     <button
+                        className={`tab-btn ${activeTab === 'media' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('media')}
+                    >
+                        <ImageIcon size={18} /> Mac Kareleri ({matchMedia.length})
+                    </button>
+                    <button
                         className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
                         onClick={() => setActiveTab('comments')}
                     >
@@ -256,6 +290,25 @@ const MatchDetail = () => {
 
                 {activeTab === 'summary' && (
                     <div className="tab-pane animate-slide-up">
+                        <div className="match-stats-grid mb-4">
+                            <div className="glass-panel p-3 text-center">
+                                <div className="text-muted text-xs">Toplam Olay</div>
+                                <div className="font-bold text-gradient">{matchStats.toplamOlay}</div>
+                            </div>
+                            <div className="glass-panel p-3 text-center">
+                                <div className="text-muted text-xs">Gol</div>
+                                <div className="font-bold" style={{ color: '#10b981' }}>{matchStats.gol}</div>
+                            </div>
+                            <div className="glass-panel p-3 text-center">
+                                <div className="text-muted text-xs">Sari Kart</div>
+                                <div className="font-bold" style={{ color: '#fbbf24' }}>{matchStats.sariKart}</div>
+                            </div>
+                            <div className="glass-panel p-3 text-center">
+                                <div className="text-muted text-xs">Kirmizi Kart</div>
+                                <div className="font-bold" style={{ color: '#ef4444' }}>{matchStats.kirmiziKart}</div>
+                            </div>
+                        </div>
+
                         {events.length > 0 ? (
                             <div className="events-timeline glass-panel p-4">
                                 <h3 className="section-title mb-4">Onemli Anlar</h3>
@@ -294,6 +347,36 @@ const MatchDetail = () => {
                                 <Activity size={48} className="text-muted mb-4" />
                                 <h3>Olay Kaydi Yok</h3>
                                 <p className="text-muted">Bu maca ait olay bilgisi bulunmuyor.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'media' && (
+                    <div className="tab-pane animate-slide-up">
+                        {matchMedia.length > 0 ? (
+                            <div className="media-grid">
+                                {matchMedia.map((media) => (
+                                    <a key={media.id} href={media.url} target="_blank" rel="noreferrer" className="media-card glass-panel">
+                                        {isImageMedia(media.tip, media.url) ? (
+                                            <img src={media.url} alt="Mac karesi" />
+                                        ) : (
+                                            <div className="media-card-fallback">
+                                                <ImageIcon size={24} />
+                                                <span>Medyayi Ac</span>
+                                            </div>
+                                        )}
+                                        <div className="media-card-meta">
+                                            <span className="badge badge-warning">{media.tip || 'MEDIA'}</span>
+                                        </div>
+                                    </a>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-state glass-panel text-center py-5">
+                                <ImageIcon size={48} className="text-muted mb-4" />
+                                <h3>Mac Karesi Yok</h3>
+                                <p className="text-muted">Bu mac icin veritabaninda medya kaydi bulunmuyor.</p>
                             </div>
                         )}
                     </div>

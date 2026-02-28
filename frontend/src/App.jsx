@@ -10,6 +10,10 @@ import Matches from './pages/Matches';
 import MatchDetail from './pages/MatchDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Notifications from './pages/Notifications';
+import EditorPanel from './pages/EditorPanel';
+import AdminPanel from './pages/AdminPanel';
+import RoleRoute from './components/auth/RoleRoute';
 
 function App() {
   return (
@@ -23,8 +27,15 @@ function App() {
           <Route path="matches/:id" element={<MatchDetail />} />
           <Route path="players" element={<Players />} />
           <Route path="players/:id" element={<PlayerDetail />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route element={<RoleRoute allowedRoles={['EDITOR']} />}>
+            <Route path="editor-panel" element={<EditorPanel />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
+            <Route path="admin-panel" element={<AdminPanel />} />
+          </Route>
         </Route>
       </Routes>
     </div>

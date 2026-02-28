@@ -63,3 +63,125 @@
         grid-template-columns: 1fr;
     }
 }
+
+.rating-form-grid {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 0.75rem;
+}
+
+.rating-score-input {
+    width: 100%;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-main);
+    padding: 0.75rem;
+}
+
+.comment-input {
+    width: 100%;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-main);
+    padding: 0.75rem;
+    resize: vertical;
+    min-height: 90px;
+}
+
+.comment-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.comment-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.comment-action-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.comment-action-btn.danger {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.comment-action-btn.danger:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.error-banner,
+.success-banner {
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+}
+
+.error-banner {
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.12);
+    color: #fda4af;
+}
+
+.success-banner {
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.12);
+    color: #6ee7b7;
+}
+
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.media-card {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.media-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary-color);
+}
+
+.media-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+}
+
+.media-card-fallback {
+    height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+}
+
+.media-card-meta {
+    padding: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .rating-form-grid {
+        grid-template-columns: 1fr;
+    }
+}

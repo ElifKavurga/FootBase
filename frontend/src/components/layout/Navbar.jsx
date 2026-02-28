@@ -1,14 +1,19 @@
-﻿import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, Users, Trophy, Activity } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, Home, Users, Trophy, Activity, Bell, ClipboardPen, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import api from '../../services/api';
 import './Navbar.css';
 
 const Navbar = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
     const location = useLocation();
     const { user, isAuthenticated, isAuthLoading, logout } = useAuth();
+    const normalizedRole = (user?.rol || '').toString().trim().toUpperCase();
+    const isEditor = normalizedRole === 'EDITOR';
+    const isAdmin = normalizedRole === 'ADMIN';
 
     useEffect(() => {
         const handleScroll = () => {
@@ -18,12 +23,48 @@ const Navbar = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setUnreadNotificationCount(0);
+            return;
+        }
+
+        let active = true;
+        const fetchUnreadCount = async () => {
+            try {
+                const response = await api.get('/notifications/unread/count');
+                if (active) {
+                    setUnreadNotificationCount(Number(response?.data?.count || 0));
+                }
+            } catch {
+                if (active) {
+                    setUnreadNotificationCount(0);
+                }
+            }
+        };
+
+        fetchUnreadCount();
+        const intervalId = setInterval(fetchUnreadCount, 30000);
+        return () => {
+            active = false;
+            clearInterval(intervalId);
+        };
+    }, [isAuthenticated]);
+
     const navLinks = [
         { name: 'Ana Sayfa', path: '/', icon: <Home size={18} /> },
         { name: 'Maclar', path: '/matches', icon: <Activity size={18} /> },
         { name: 'Takimlar', path: '/teams', icon: <Trophy size={18} /> },
         { name: 'Oyuncular', path: '/players', icon: <Users size={18} /> }
     ];
+
+    if (isEditor) {
+        navLinks.push({ name: 'Editor Paneli', path: '/editor-panel', icon: <ClipboardPen size={18} /> });
+    }
+
+    if (isAdmin) {
+        navLinks.push({ name: 'Admin Paneli', path: '/admin-panel', icon: <ShieldCheck size={18} /> });
+    }
 
     return (
         <nav className={`navbar ${isScrolled ? 'scrolled glass-panel' : ''}`}>
@@ -53,6 +94,12 @@ const Navbar = () => {
                         <span className="navbar-user">Yukleniyor...</span>
                     ) : isAuthenticated ? (
                         <>
+                            <Link to="/notifications" className="notification-link" aria-label="Bildirimler">
+                                <Bell size={18} />
+                                {unreadNotificationCount > 0 && (
+                                    <span className="notification-badge">{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
+                                )}
+                            </Link>
                             <span className="navbar-user">{user?.kullaniciAdi || user?.email || 'Kullanici'}</span>
                             <button
                                 type="button"
@@ -97,6 +144,17 @@ const Navbar = () => {
                             <div className="mobile-user-label">Yukleniyor...</div>
                         ) : isAuthenticated ? (
                             <>
+                                <Link
+                                    to="/notifications"
+                                    className={`mobile-link ${location.pathname === '/notifications' ? 'active' : ''}`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    <Bell size={18} />
+                                    Bildirimler
+                                    {unreadNotificationCount > 0 && (
+                                        <span className="notification-badge">{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
+                                    )}
+                                </Link>
                                 <div className="mobile-user-label">{user?.kullaniciAdi || user?.email || 'Kullanici'}</div>
                                 <button
                                     type="button"
@@ -124,4 +182,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-
