@@ -3,6 +3,8 @@ package com.footbase.service;
 import com.footbase.entity.Kullanici;
 import com.footbase.entity.Mac;
 import com.footbase.entity.Yorum;
+import com.footbase.patterns.chain.HandlerResult;
+import com.footbase.patterns.chain.yorum.YorumModerationChain;
 import com.footbase.repository.KullaniciRepository;
 import com.footbase.repository.MacRepository;
 import com.footbase.repository.YorumRepository;
@@ -24,10 +26,19 @@ public class YorumService {
     @Autowired
     private KullaniciRepository kullaniciRepository;
 
+    @Autowired
+    private YorumModerationChain yorumModerationChain;
+
     public List<Yorum> macYorumlariniGetir(Long macId) {
         Mac mac = macRepository.findById(macId)
                 .orElseThrow(() -> new RuntimeException("Mac bulunamadi"));
-        return yorumRepository.findByMacOrderByYorumTarihiDesc(mac);
+        return yorumRepository.findByMacOrderByYorumTarihiDesc(mac)
+                .stream()
+                .filter(yorum -> {
+                    String tip = yorum.getYorumTipi();
+                    return tip == null || "USER".equalsIgnoreCase(tip) || "ONAYLANDI".equalsIgnoreCase(tip);
+                })
+                .toList();
     }
 
     public Yorum yorumOlustur(Long macId, Long kullaniciId, String mesaj) {
@@ -40,6 +51,13 @@ public class YorumService {
         yorum.setMac(mac);
         yorum.setKullanici(kullanici);
         yorum.setMesaj(mesaj);
+
+        HandlerResult moderationResult = yorumModerationChain.moderate(yorum);
+        if (moderationResult.isSuccess()) {
+            yorum.setYorumTipi("ONAYLANDI");
+        } else {
+            yorum.setYorumTipi("FILTRE_TAKILDI");
+        }
         return yorumRepository.save(yorum);
     }
 
@@ -84,6 +102,31 @@ public class YorumService {
     }
 
     public List<Yorum> sonYorumlariGetir(int limit) {
-        return yorumRepository.findTopByOrderByYorumTarihiDesc(PageRequest.of(0, limit));
+        return yorumRepository.findTopByOrderByYorumTarihiDesc(PageRequest.of(0, limit))
+                .stream()
+                .filter(yorum -> {
+                    String tip = yorum.getYorumTipi();
+                    return tip == null || "USER".equalsIgnoreCase(tip) || "ONAYLANDI".equalsIgnoreCase(tip);
+                })
+                .toList();
+    }
+
+    public List<Yorum> moderasyonYorumlariniGetir() {
+        return yorumRepository.findByYorumTipiInOrderByYorumTarihiDesc(
+                java.util.List.of("ONAY_BEKLIYOR", "FILTRE_TAKILDI"));
+    }
+
+    public Yorum yorumOnayla(Long yorumId) {
+        Yorum yorum = yorumRepository.findById(yorumId)
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadi"));
+
+        yorum.setYorumTipi("ONAYLANDI");
+        return yorumRepository.save(yorum);
+    }
+
+    public void yorumSilAdmin(Long yorumId) {
+        Yorum yorum = yorumRepository.findById(yorumId)
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadi"));
+        yorumRepository.delete(yorum);
     }
 }

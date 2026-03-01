@@ -10,6 +10,7 @@ import com.footbase.security.JwtUtil;
 import com.footbase.service.MacService;
 import com.footbase.service.TakimService;
 import com.footbase.service.OyuncuService;
+import com.footbase.service.YorumService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +36,9 @@ public class AdminController {
 
     @Autowired
     private OyuncuService oyuncuService;
+
+    @Autowired
+    private YorumService yorumService;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -279,6 +283,61 @@ public class AdminController {
             e.printStackTrace();
             return ResponseEntity.internalServerError()
                     .body(Map.of("hata", "İşlem geçmişi getirilirken bir hata oluştu: " + e.getMessage()));
+        }
+    }
+
+    // ========== YORUM MODERASYON ==========
+
+    @GetMapping("/comments/moderation")
+    public ResponseEntity<?> moderasyonYorumlariniGetir(HttpServletRequest request) {
+        try {
+            Long adminId = getKullaniciIdFromToken(request);
+            if (adminId == null) {
+                return ResponseEntity.status(401).body(Map.of("hata", "Giriş yapmanız gerekiyor"));
+            }
+
+            return ResponseEntity.ok(yorumService.moderasyonYorumlariniGetir());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("hata", "Moderasyon yorumları getirilirken bir hata oluştu: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/comments/{yorumId}/approve")
+    public ResponseEntity<?> yorumuOnayla(@PathVariable Long yorumId, HttpServletRequest request) {
+        try {
+            Long adminId = getKullaniciIdFromToken(request);
+            if (adminId == null) {
+                return ResponseEntity.status(401).body(Map.of("hata", "Giriş yapmanız gerekiyor"));
+            }
+
+            return ResponseEntity.ok(yorumService.yorumOnayla(yorumId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("hata", "Yorum onaylanırken bir hata oluştu: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/comments/{yorumId}")
+    public ResponseEntity<?> yorumuSilAdmin(@PathVariable Long yorumId, HttpServletRequest request) {
+        try {
+            Long adminId = getKullaniciIdFromToken(request);
+            if (adminId == null) {
+                return ResponseEntity.status(401).body(Map.of("hata", "Giriş yapmanız gerekiyor"));
+            }
+
+            yorumService.yorumSilAdmin(yorumId);
+            return ResponseEntity.ok(Map.of("mesaj", "Yorum silindi"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("hata", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("hata", "Yorum silinirken bir hata oluştu: " + e.getMessage()));
         }
     }
 }

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, User, MapPin, Trophy, Activity, MessageSquare, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Trophy, Activity, MessageSquare, Pencil, Trash2, Image as ImageIcon, PlusCircle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import MediaUploadModal from '../components/media/MediaUploadModal';
+import { addPlayerMedia } from '../services/mediaService';
 import './PlayerDetail.css';
 
 const normalizeRating = (item) => ({
@@ -20,6 +22,8 @@ const normalizeMedia = (item) => ({
     tip: (item?.tip || '').toUpperCase(),
     aciklama: item?.aciklama || ''
 });
+
+const normalizeRole = (role) => (role || '').toString().trim().toUpperCase();
 
 const isImageMedia = (tip = '', url = '') => {
     const t = tip.toUpperCase();
@@ -50,6 +54,10 @@ const PlayerDetail = () => {
     const [editingRatingId, setEditingRatingId] = useState(null);
     const [editingComment, setEditingComment] = useState('');
     const [editingScore, setEditingScore] = useState('');
+    const [showMediaModal, setShowMediaModal] = useState(false);
+    const [mediaSubmitting, setMediaSubmitting] = useState(false);
+    const [mediaError, setMediaError] = useState('');
+    const [mediaSuccess, setMediaSuccess] = useState('');
 
     const loadRatings = useCallback(async () => {
         const ratingsRes = await api.get(`/players/${id}/ratings`).catch(() => ({ data: [] }));
@@ -183,6 +191,29 @@ const PlayerDetail = () => {
         }
     };
 
+    const handlePlayerMediaSubmit = async ({ tip, url, file, aciklama }) => {
+        setMediaSubmitting(true);
+        setMediaError('');
+        setMediaSuccess('');
+        try {
+            await addPlayerMedia({
+                playerId: id,
+                tip,
+                url,
+                file,
+                aciklama,
+                userRole: user?.rol
+            });
+            setShowMediaModal(false);
+            setMediaSuccess('Oyuncu medyasi eklendi.');
+            await loadMedia();
+        } catch (err) {
+            setMediaError(err?.response?.data?.hata || err?.response?.data?.mesaj || 'Oyuncu medyasi eklenemedi.');
+        } finally {
+            setMediaSubmitting(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="container flex-center" style={{ minHeight: '60vh' }}>
@@ -201,6 +232,8 @@ const PlayerDetail = () => {
             </div>
         );
     }
+
+    const isPrivileged = isAuthenticated && ['ADMIN', 'EDITOR'].includes(normalizeRole(user?.rol));
 
     return (
         <div className="player-detail-page container animate-fade-in">
@@ -299,6 +332,16 @@ const PlayerDetail = () => {
 
                 {activeTab === 'media' && (
                     <div className="tab-pane animate-slide-up">
+                        {isPrivileged && (
+                            <div className="media-action-row mb-3">
+                                <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowMediaModal(true)}>
+                                    <PlusCircle size={14} />
+                                    Yeni Medya Ekle
+                                </button>
+                            </div>
+                        )}
+                        {mediaError && <div className="error-banner mb-3">{mediaError}</div>}
+                        {mediaSuccess && <div className="success-banner mb-3">{mediaSuccess}</div>}
                         {playerMedia.length > 0 ? (
                             <div className="media-grid">
                                 {playerMedia.map((media) => (
@@ -456,6 +499,20 @@ const PlayerDetail = () => {
                     </div>
                 )}
             </div>
+
+            {showMediaModal && (
+                <MediaUploadModal
+                    title="Oyuncuya Yeni Medya Ekle"
+                    busy={mediaSubmitting}
+                    error={mediaError}
+                    onClose={() => {
+                        if (!mediaSubmitting) {
+                            setShowMediaModal(false);
+                        }
+                    }}
+                    onSubmit={handlePlayerMediaSubmit}
+                />
+            )}
         </div>
     );
 };

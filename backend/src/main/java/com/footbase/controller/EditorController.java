@@ -144,6 +144,10 @@ public class EditorController {
 
             Long oyuncuId = Long.valueOf(olayData.get("oyuncuId").toString());
             String olayTuru = olayData.get("olayTuru").toString();
+            Integer dakika = null;
+            if (olayData.get("dakika") != null) {
+                dakika = Integer.valueOf(olayData.get("dakika").toString());
+            }
 
             Oyuncu oyuncu = oyuncuRepository.findById(oyuncuId)
                     .orElseThrow(() -> new RuntimeException("Oyuncu bulunamadı"));
@@ -153,6 +157,7 @@ public class EditorController {
             olay.setMac(mac);
             olay.setOyuncu(oyuncu);
             olay.setOlayTuru(olayTuru);
+            olay.setDakika(dakika);
 
             macOyuncuOlaylariRepository.save(olay);
 

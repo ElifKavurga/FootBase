@@ -100,7 +100,7 @@ const Navbar = () => {
                                     <span className="notification-badge">{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
                                 )}
                             </Link>
-                            <span className="navbar-user">{user?.kullaniciAdi || user?.email || 'Kullanici'}</span>
+                            <Link to="/profile" className="navbar-user">{user?.kullaniciAdi || user?.email || 'Kullanici'}</Link>
                             <button
                                 type="button"
                                 className="btn btn-outline"
@@ -155,7 +155,9 @@ const Navbar = () => {
                                         <span className="notification-badge">{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
                                     )}
                                 </Link>
-                                <div className="mobile-user-label">{user?.kullaniciAdi || user?.email || 'Kullanici'}</div>
+                                <Link to="/profile" className="mobile-user-label" onClick={() => setMobileMenuOpen(false)}>
+                                    {user?.kullaniciAdi || user?.email || 'Kullanici'}
+                                </Link>
                                 <button
                                     type="button"
                                     className="btn btn-outline"

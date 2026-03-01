@@ -1,0 +1,70 @@
+.media-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 7, 18, 0.66);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 1rem;
+}
+
+.media-modal {
+    width: min(560px, 100%);
+    border: 1px solid var(--border-light);
+    padding: 1rem;
+}
+
+.media-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.media-modal-header h3 {
+    margin: 0;
+}
+
+.media-modal-close {
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.media-modal-form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.media-modal-form label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.media-modal-form input,
+.media-modal-form select,
+.media-modal-form textarea {
+    width: 100%;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    padding: 0.7rem 0.85rem;
+    outline: none;
+}
+
+.media-modal-form input:focus,
+.media-modal-form select:focus,
+.media-modal-form textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}

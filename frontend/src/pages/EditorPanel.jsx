@@ -15,14 +15,24 @@ const statusMap = {
     REDDEDILDI: { label: 'Reddedildi', className: 'badge-danger' }
 };
 
+const getRefereeLabel = (referee) => referee?.adSoyad || referee?.name || referee?.ad || `Hakem #${referee?.id}`;
+const getStadiumLabel = (stadium) => stadium?.stadyumAdi || stadium?.ad || stadium?.name || `Stadyum #${stadium?.id}`;
+const getLeagueLabel = (league) => league?.ligAdi || league?.ad || league?.name || `Lig #${league?.id}`;
+
 const EditorPanel = () => {
     const [teams, setTeams] = useState([]);
+    const [referees, setReferees] = useState([]);
+    const [stadiums, setStadiums] = useState([]);
+    const [leagues, setLeagues] = useState([]);
     const [myMatches, setMyMatches] = useState([]);
     const [form, setForm] = useState({
         evSahibiTakimId: '',
         deplasmanTakimId: '',
         tarih: '',
-        saat: ''
+        saat: '',
+        hakemId: '',
+        stadyumId: '',
+        ligId: ''
     });
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -30,23 +40,32 @@ const EditorPanel = () => {
     const [success, setSuccess] = useState('');
 
     const canSubmit = useMemo(() => {
-        const { evSahibiTakimId, deplasmanTakimId, tarih, saat } = form;
+        const { evSahibiTakimId, deplasmanTakimId, tarih, saat, hakemId, stadyumId, ligId } = form;
         return Boolean(
             evSahibiTakimId &&
             deplasmanTakimId &&
             tarih &&
             saat &&
+            hakemId &&
+            stadyumId &&
+            ligId &&
             evSahibiTakimId !== deplasmanTakimId
         );
     }, [form]);
 
     const loadPanelData = useCallback(async () => {
-        const [teamsRes, myMatchesRes] = await Promise.all([
+        const [teamsRes, refereesRes, stadiumsRes, leaguesRes, myMatchesRes] = await Promise.all([
             api.get('/teams').catch(() => ({ data: [] })),
+            api.get('/referees').catch(() => ({ data: [] })),
+            api.get('/stadiums').catch(() => ({ data: [] })),
+            api.get('/leagues').catch(() => ({ data: [] })),
             api.get('/editor/matches/my-matches').catch(() => ({ data: [] }))
         ]);
 
         setTeams(Array.isArray(teamsRes?.data) ? teamsRes.data : []);
+        setReferees(Array.isArray(refereesRes?.data) ? refereesRes.data : []);
+        setStadiums(Array.isArray(stadiumsRes?.data) ? stadiumsRes.data : []);
+        setLeagues(Array.isArray(leaguesRes?.data) ? leaguesRes.data : []);
         setMyMatches(Array.isArray(myMatchesRes?.data) ? myMatchesRes.data : []);
     }, []);
 
@@ -83,13 +102,24 @@ const EditorPanel = () => {
                 deplasmanTakim: { id: Number(form.deplasmanTakimId) },
                 tarih: form.tarih,
                 saat: form.saat.length === 5 ? `${form.saat}:00` : form.saat,
+                hakem: { id: Number(form.hakemId) },
+                stadyum: { id: Number(form.stadyumId) },
+                lig: { id: Number(form.ligId) },
                 evSahibiSkor: 0,
                 deplasmanSkor: 0
             };
 
             await api.post('/editor/matches', payload);
             setSuccess('Mac eklendi. Admin paneline onay bildirimi gonderildi.');
-            setForm({ evSahibiTakimId: '', deplasmanTakimId: '', tarih: '', saat: '' });
+            setForm({
+                evSahibiTakimId: '',
+                deplasmanTakimId: '',
+                tarih: '',
+                saat: '',
+                hakemId: '',
+                stadyumId: '',
+                ligId: ''
+            });
             await loadPanelData();
         } catch (err) {
             setError(err?.response?.data?.hata || 'Mac eklenirken hata olustu.');
@@ -177,6 +207,54 @@ const EditorPanel = () => {
                                 />
                             </label>
                         </div>
+
+                        <label>
+                            Hakem
+                            <select
+                                value={form.hakemId}
+                                onChange={(e) => setForm((prev) => ({ ...prev, hakemId: e.target.value }))}
+                                required
+                            >
+                                <option value="">Hakem sec</option>
+                                {referees.map((referee) => (
+                                    <option key={referee.id} value={referee.id}>
+                                        {getRefereeLabel(referee)}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label>
+                            Stadyum
+                            <select
+                                value={form.stadyumId}
+                                onChange={(e) => setForm((prev) => ({ ...prev, stadyumId: e.target.value }))}
+                                required
+                            >
+                                <option value="">Stadyum sec</option>
+                                {stadiums.map((stadium) => (
+                                    <option key={stadium.id} value={stadium.id}>
+                                        {getStadiumLabel(stadium)}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label>
+                            Lig
+                            <select
+                                value={form.ligId}
+                                onChange={(e) => setForm((prev) => ({ ...prev, ligId: e.target.value }))}
+                                required
+                            >
+                                <option value="">Lig sec</option>
+                                {leagues.map((league) => (
+                                    <option key={league.id} value={league.id}>
+                                        {getLeagueLabel(league)}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
 
                         <button type="submit" className="btn btn-primary" disabled={!canSubmit || submitting}>
                             <PlusCircle size={16} />

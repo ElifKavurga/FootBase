@@ -153,7 +153,113 @@
     padding: 0.75rem;
 }
 
+.media-action-row {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.match-control-panel {
+    border: 1px solid var(--border-light);
+    padding: 1rem;
+}
+
+.match-control-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.match-control-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.match-control-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.match-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 7, 18, 0.66);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 1rem;
+}
+
+.match-modal {
+    width: min(560px, 100%);
+    border: 1px solid var(--border-light);
+    padding: 1rem;
+}
+
+.match-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.match-modal-header h3 {
+    margin: 0;
+}
+
+.match-modal-close {
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.match-modal-form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.match-modal-form label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.match-modal-form input,
+.match-modal-form select,
+.match-modal-form textarea {
+    width: 100%;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-light);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    padding: 0.7rem 0.85rem;
+    outline: none;
+}
+
+.match-modal-form input:focus,
+.match-modal-form select:focus,
+.match-modal-form textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
 @media (max-width: 768px) {
+    .match-control-header {
+        flex-direction: column;
+    }
+
     .match-stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }

@@ -9,6 +9,7 @@ import com.footbase.repository.YorumRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,19 +29,51 @@ public class KullaniciService {
 
     public Map<String, Object> kullaniciGetir(Long id) {
         Kullanici kullanici = kullaniciRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
         return kullaniciBilgileriniMaple(kullanici);
     }
 
     public Map<String, Object> kullaniciGetirByEmail(String email) {
         Kullanici kullanici = kullaniciRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
         return kullaniciBilgileriniMaple(kullanici);
     }
 
     public Map<String, Object> kullaniciGuncelle(Long id, Kullanici kullanici) {
         Kullanici mevcutKullanici = kullaniciRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
+        return kullaniciyiGuncelle(mevcutKullanici, kullanici);
+    }
+
+    public Map<String, Object> kullaniciGuncelleByEmail(String email, Kullanici kullanici) {
+        Kullanici mevcutKullanici = kullaniciRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
+        return kullaniciyiGuncelle(mevcutKullanici, kullanici);
+    }
+
+    public List<Map<String, Object>> kullaniciGecmisiGetirByEmail(String email) {
+        Kullanici kullanici = kullaniciRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi"));
+        return kullaniciGecmisiMaple(kullanici);
+    }
+
+    private Map<String, Object> kullaniciyiGuncelle(Kullanici mevcutKullanici, Kullanici kullanici) {
+        if (kullanici.getEmail() != null && !kullanici.getEmail().isBlank()) {
+            String yeniEmail = kullanici.getEmail().trim();
+            if (!mevcutKullanici.getEmail().equalsIgnoreCase(yeniEmail) && kullaniciRepository.existsByEmail(yeniEmail)) {
+                throw new RuntimeException("Bu e-posta zaten kullaniliyor");
+            }
+            mevcutKullanici.setEmail(yeniEmail);
+        }
+
+        if (kullanici.getKullaniciAdi() != null && !kullanici.getKullaniciAdi().isBlank()) {
+            String yeniKullaniciAdi = kullanici.getKullaniciAdi().trim();
+            if (!mevcutKullanici.getKullaniciAdi().equalsIgnoreCase(yeniKullaniciAdi)
+                    && kullaniciRepository.existsByKullaniciAdi(yeniKullaniciAdi)) {
+                throw new RuntimeException("Bu kullanici adi zaten kullaniliyor");
+            }
+            mevcutKullanici.setKullaniciAdi(yeniKullaniciAdi);
+        }
 
         if (kullanici.getAd() != null) {
             mevcutKullanici.setAd(kullanici.getAd());
@@ -48,20 +81,12 @@ public class KullaniciService {
         if (kullanici.getSoyad() != null) {
             mevcutKullanici.setSoyad(kullanici.getSoyad());
         }
-        if (kullanici.getKullaniciAdi() != null) {
-            // Kullanıcı adı değişiyorsa kontrol et
-            if (!mevcutKullanici.getKullaniciAdi().equals(kullanici.getKullaniciAdi())
-                    && kullaniciRepository.existsByKullaniciAdi(kullanici.getKullaniciAdi())) {
-                throw new RuntimeException("Bu kullanıcı adı zaten kullanılıyor");
-            }
-            mevcutKullanici.setKullaniciAdi(kullanici.getKullaniciAdi());
-        }
         if (kullanici.getProfilResmi() != null) {
             mevcutKullanici.setProfilResmi(kullanici.getProfilResmi());
         }
 
-        Kullanici guncellenmisKullanici = kullaniciRepository.save(mevcutKullanici);
-        return kullaniciBilgileriniMaple(guncellenmisKullanici);
+        Kullanici guncellenmis = kullaniciRepository.save(mevcutKullanici);
+        return kullaniciBilgileriniMaple(guncellenmis);
     }
 
     private Map<String, Object> kullaniciBilgileriniMaple(Kullanici kullanici) {
@@ -69,28 +94,30 @@ public class KullaniciService {
         kullaniciMap.put("id", kullanici.getId());
         kullaniciMap.put("email", kullanici.getEmail());
         kullaniciMap.put("kullaniciAdi", kullanici.getKullaniciAdi());
-        kullaniciMap.put("displayName", kullanici.getKullaniciAdi()); // Frontend için
+        kullaniciMap.put("displayName", kullanici.getKullaniciAdi());
         kullaniciMap.put("rol", kullanici.getRol());
         kullaniciMap.put("admin",
                 kullanici.getAdmin() != null ? kullanici.getAdmin() : "ADMIN".equals(kullanici.getRol()));
         kullaniciMap.put("ad", kullanici.getAd() != null ? kullanici.getAd() : "");
         kullaniciMap.put("soyad", kullanici.getSoyad() != null ? kullanici.getSoyad() : "");
         kullaniciMap.put("profilResmi", kullanici.getProfilResmi() != null ? kullanici.getProfilResmi() : "");
-        kullaniciMap.put("followersCount", 0); // Veritabanında takipçi tablosu yok
-        kullaniciMap.put("followingCount", 0); // Veritabanında takip tablosu yok
+        kullaniciMap.put("followersCount", 0);
+        kullaniciMap.put("followingCount", 0);
+        kullaniciMap.put("recentComments", kullaniciGecmisiMaple(kullanici).stream().limit(10).collect(Collectors.toList()));
+        return kullaniciMap;
+    }
 
-        // Kullanıcının yorumlarını getir (maç yorumları)
+    private List<Map<String, Object>> kullaniciGecmisiMaple(Kullanici kullanici) {
         List<Yorum> macYorumlari = yorumRepository.findByKullaniciOrderByYorumTarihiDesc(kullanici);
-        List<Map<String, Object>> recentComments = macYorumlari.stream()
-                .limit(10) // Son 10 yorum
+        List<Map<String, Object>> gecmis = macYorumlari.stream()
                 .map(yorum -> {
                     Map<String, Object> yorumMap = new HashMap<>();
                     yorumMap.put("commentId", yorum.getId());
+                    yorumMap.put("type", "MAC_YORUMU");
                     yorumMap.put("message", yorum.getMesaj());
                     yorumMap.put("createdAt", yorum.getYorumTarihi());
                     if (yorum.getMac() != null) {
                         yorumMap.put("matchId", yorum.getMac().getId());
-                        // Maç başlığını oluştur
                         String matchTitle = "";
                         if (yorum.getMac().getEvSahibiTakim() != null && yorum.getMac().getDeplasmanTakim() != null) {
                             matchTitle = yorum.getMac().getEvSahibiTakim().getAd() + " vs "
@@ -102,44 +129,40 @@ public class KullaniciService {
                 })
                 .collect(Collectors.toList());
 
-        // Kullanıcının oyuncu yorumlarını da ekle
         List<OyuncuYorumlari> oyuncuYorumlari = oyuncuYorumlariRepository
                 .findByKullaniciOrderByOlusturmaTarihiDesc(kullanici);
         List<Map<String, Object>> oyuncuYorumListesi = oyuncuYorumlari.stream()
-                .limit(10) // Son 10 oyuncu yorumu
                 .map(oyYorum -> {
                     Map<String, Object> yorumMap = new HashMap<>();
                     yorumMap.put("commentId", "oyuncu_" + oyYorum.getId());
+                    yorumMap.put("type", "OYUNCU_PUANLAMASI");
                     yorumMap.put("message", oyYorum.getIcerik());
                     yorumMap.put("createdAt", oyYorum.getOlusturmaTarihi());
                     if (oyYorum.getOyuncu() != null) {
                         yorumMap.put("playerId", oyYorum.getOyuncu().getId());
                         String playerName = (oyYorum.getOyuncu().getAd() != null ? oyYorum.getOyuncu().getAd() : "") +
                                 " " + (oyYorum.getOyuncu().getSoyad() != null ? oyYorum.getOyuncu().getSoyad() : "");
-                        yorumMap.put("matchTitle", "Oyuncu: " + playerName.trim()); // Frontend'de matchTitle olarak
-                                                                                    // gösterilecek
+                        yorumMap.put("matchTitle", "Oyuncu: " + playerName.trim());
                     }
                     return yorumMap;
                 })
                 .collect(Collectors.toList());
 
-        // Tüm yorumları birleştir ve tarihe göre sırala
-        recentComments.addAll(oyuncuYorumListesi);
-        recentComments.sort((a, b) -> {
-            java.time.LocalDateTime dateA = (java.time.LocalDateTime) a.get("createdAt");
-            java.time.LocalDateTime dateB = (java.time.LocalDateTime) b.get("createdAt");
-            if (dateA == null && dateB == null)
+        gecmis.addAll(oyuncuYorumListesi);
+        gecmis.sort((a, b) -> {
+            LocalDateTime dateA = (LocalDateTime) a.get("createdAt");
+            LocalDateTime dateB = (LocalDateTime) b.get("createdAt");
+            if (dateA == null && dateB == null) {
                 return 0;
-            if (dateA == null)
+            }
+            if (dateA == null) {
                 return 1;
-            if (dateB == null)
+            }
+            if (dateB == null) {
                 return -1;
-            return dateB.compareTo(dateA); // Azalan sırada
+            }
+            return dateB.compareTo(dateA);
         });
-
-        // Son 10 yorumu al
-        kullaniciMap.put("recentComments", recentComments.stream().limit(10).collect(Collectors.toList()));
-
-        return kullaniciMap;
+        return gecmis;
     }
 }

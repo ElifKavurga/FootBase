@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Collection;
 
 @Repository
 public interface YorumRepository extends JpaRepository<Yorum, Long> {
@@ -37,4 +38,11 @@ public interface YorumRepository extends JpaRepository<Yorum, Long> {
 
        @Query("SELECT y FROM Yorum y LEFT JOIN FETCH y.begenenKullanicilar WHERE y.id = :yorumId")
        java.util.Optional<Yorum> findByIdWithLikes(Long yorumId);
+
+       @Query("SELECT DISTINCT y FROM Yorum y " +
+                     "LEFT JOIN FETCH y.kullanici " +
+                     "LEFT JOIN FETCH y.mac " +
+                     "WHERE y.yorumTipi IN :durumlar " +
+                     "ORDER BY y.yorumTarihi DESC")
+       List<Yorum> findByYorumTipiInOrderByYorumTarihiDesc(Collection<String> durumlar);
 }

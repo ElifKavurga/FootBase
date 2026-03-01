@@ -13,6 +13,7 @@ import Register from './pages/Register';
 import Notifications from './pages/Notifications';
 import EditorPanel from './pages/EditorPanel';
 import AdminPanel from './pages/AdminPanel';
+import Profile from './pages/Profile';
 import RoleRoute from './components/auth/RoleRoute';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
           <Route path="matches/:id" element={<MatchDetail />} />
           <Route path="players" element={<Players />} />
           <Route path="players/:id" element={<PlayerDetail />} />
+          <Route path="profile" element={<Profile />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />

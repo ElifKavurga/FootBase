@@ -115,6 +115,11 @@
     text-overflow: ellipsis;
 }
 
+a.navbar-user:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
 .notification-link {
     position: relative;
     display: inline-flex;
@@ -220,6 +225,10 @@
     margin-bottom: 1rem;
     color: var(--text-muted);
     font-size: 0.9rem;
+}
+
+a.mobile-user-label {
+    display: inline-block;
 }
 
 @media (max-width: 768px) {

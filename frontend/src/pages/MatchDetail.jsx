@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Trophy, Activity, MessageSquare, Flame, Heart, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Trophy, Activity, MessageSquare, Flame, Heart, Pencil, Trash2, Image as ImageIcon, PlusCircle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import MatchManagementPanel from '../components/matches/MatchManagementPanel';
+import MediaUploadModal from '../components/media/MediaUploadModal';
+import { addMatchMedia } from '../services/mediaService';
 import './MatchDetail.css';
 
 const normalizeComment = (comment) => ({
@@ -18,6 +21,17 @@ const normalizeMedia = (item) => ({
     url: item?.url || '',
     tip: (item?.tip || '').toUpperCase()
 });
+
+const normalizeEvent = (event, index) => ({
+    ...event,
+    id: event?.id || `event-${index}`,
+    takimId: event?.takimId ?? event?.oyuncu?.takim?.id ?? null,
+    aciklama: event?.aciklama || [event?.oyuncu?.ad, event?.oyuncu?.soyad].filter(Boolean).join(' ').trim() || event?.olayTuru || 'Olay',
+    olayTuru: (event?.olayTuru || '').toUpperCase(),
+    dakika: event?.dakika ?? null
+});
+
+const normalizeRole = (role) => (role || '').toString().trim().toUpperCase();
 
 const isImageMedia = (tip = '', url = '') => {
     const t = tip.toUpperCase();
@@ -46,6 +60,10 @@ const MatchDetail = () => {
     const [editingText, setEditingText] = useState('');
     const [actionLoadingId, setActionLoadingId] = useState(null);
     const [likedCommentIds, setLikedCommentIds] = useState({});
+    const [showMediaModal, setShowMediaModal] = useState(false);
+    const [mediaSubmitting, setMediaSubmitting] = useState(false);
+    const [mediaError, setMediaError] = useState('');
+    const [mediaSuccess, setMediaSuccess] = useState('');
 
     const loadComments = useCallback(async () => {
         const commentsRes = await api.get(`/matches/${id}/comments`).catch(() => ({ data: [] }));
@@ -67,46 +85,50 @@ const MatchDetail = () => {
         setMatchStats(next);
     };
 
-    useEffect(() => {
-        const fetchMatchDetails = async () => {
+    const fetchMatchDetails = useCallback(async ({ withLoading = false } = {}) => {
+        if (withLoading) {
             setLoading(true);
-            try {
-                const detayliRes = await api.get(`/matches/${id}/detayli`).catch(() => ({ data: null }));
+        }
+        try {
+            const detayliRes = await api.get(`/matches/${id}/detayli`).catch(() => ({ data: null }));
 
-                if (detayliRes?.data?.mac) {
-                    const detay = detayliRes.data;
-                    const detayEvents = detay?.olaylar || [];
-                    const detayMedia = detay?.medya || [];
+            if (detayliRes?.data?.mac) {
+                const detay = detayliRes.data;
+                const detayEvents = (detay?.olaylar || []).map(normalizeEvent);
+                const detayMedia = detay?.medya || [];
 
-                    setMatch(detay.mac);
-                    setEvents(detayEvents);
-                    setMatchMedia(detayMedia.map(normalizeMedia));
-                    calculateStats(detayEvents);
-                } else {
-                    const [matchRes, eventsRes, mediaRes] = await Promise.all([
-                        api.get(`/matches/${id}`),
-                        api.get(`/matches/${id}/events`).catch(() => ({ data: [] })),
-                        api.get(`/matches/${id}/media`).catch(() => ({ data: [] }))
-                    ]);
+                setMatch(detay.mac);
+                setEvents(detayEvents);
+                setMatchMedia(detayMedia.map(normalizeMedia));
+                calculateStats(detayEvents);
+            } else {
+                const [matchRes, eventsRes, mediaRes] = await Promise.all([
+                    api.get(`/matches/${id}`),
+                    api.get(`/matches/${id}/events`).catch(() => ({ data: [] })),
+                    api.get(`/matches/${id}/media`).catch(() => ({ data: [] }))
+                ]);
 
-                    const fallbackEvents = eventsRes.data || [];
-                    setMatch(matchRes.data);
-                    setEvents(fallbackEvents);
-                    setMatchMedia((mediaRes.data || []).map(normalizeMedia));
-                    calculateStats(fallbackEvents);
-                }
+                const fallbackEvents = (eventsRes.data || []).map(normalizeEvent);
+                setMatch(matchRes.data);
+                setEvents(fallbackEvents);
+                setMatchMedia((mediaRes.data || []).map(normalizeMedia));
+                calculateStats(fallbackEvents);
+            }
 
-                await loadComments();
-            } catch (err) {
-                console.error('Mac detaylari cekilirken hata:', err);
-                setError('Mac bilgileri yuklenirken bir sorun olustu.');
-            } finally {
+            await loadComments();
+        } catch (err) {
+            console.error('Mac detaylari cekilirken hata:', err);
+            setError('Mac bilgileri yuklenirken bir sorun olustu.');
+        } finally {
+            if (withLoading) {
                 setLoading(false);
             }
-        };
-
-        fetchMatchDetails();
+        }
     }, [id, loadComments]);
+
+    useEffect(() => {
+        fetchMatchDetails({ withLoading: true });
+    }, [fetchMatchDetails]);
 
     const handleAddComment = async (e) => {
         e.preventDefault();
@@ -193,6 +215,29 @@ const MatchDetail = () => {
         }
     };
 
+    const handleMatchMediaSubmit = async ({ tip, url, file, aciklama }) => {
+        setMediaSubmitting(true);
+        setMediaError('');
+        setMediaSuccess('');
+        try {
+            await addMatchMedia({
+                matchId: id,
+                tip,
+                url,
+                file,
+                aciklama,
+                userRole: user?.rol
+            });
+            setShowMediaModal(false);
+            setMediaSuccess('Mac medyasi eklendi.');
+            await fetchMatchDetails({ withLoading: false });
+        } catch (err) {
+            setMediaError(err?.response?.data?.hata || err?.response?.data?.mesaj || 'Mac medyasi eklenemedi.');
+        } finally {
+            setMediaSubmitting(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="container flex-center" style={{ minHeight: '60vh' }}>
@@ -212,7 +257,9 @@ const MatchDetail = () => {
         );
     }
 
-    const isFinished = match.durum === 'BITTI' || match.evSahibiSkor !== null;
+    const isFinished = (match?.durum || '').toUpperCase() === 'BITTI';
+    const hasScore = typeof match.evSahibiSkor === 'number' && typeof match.deplasmanSkor === 'number';
+    const isPrivileged = isAuthenticated && ['ADMIN', 'EDITOR'].includes(normalizeRole(user?.rol));
 
     return (
         <div className="match-detail-page container animate-fade-in">
@@ -243,7 +290,7 @@ const MatchDetail = () => {
                     </Link>
 
                     <div className="score-container flex-center flex-column mx-4">
-                        {isFinished ? (
+                        {hasScore ? (
                             <div className="score-display text-gradient font-bold" style={{ fontSize: '4rem', lineHeight: 1 }}>
                                 {match.evSahibiSkor ?? '-'} - {match.deplasmanSkor ?? '-'}
                             </div>
@@ -265,6 +312,8 @@ const MatchDetail = () => {
                     </Link>
                 </div>
             </div>
+
+            <MatchManagementPanel matchId={id} match={match} onChanged={() => fetchMatchDetails({ withLoading: false })} />
 
             <div className="tabs-container mt-5">
                 <div className="tabs-header flex-center gap-2 mb-4 glass-panel py-2 px-2">
@@ -354,6 +403,16 @@ const MatchDetail = () => {
 
                 {activeTab === 'media' && (
                     <div className="tab-pane animate-slide-up">
+                        {isPrivileged && (
+                            <div className="media-action-row mb-3">
+                                <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowMediaModal(true)}>
+                                    <PlusCircle size={14} />
+                                    Yeni Medya Ekle
+                                </button>
+                            </div>
+                        )}
+                        {mediaError && <div className="error-banner mb-3">{mediaError}</div>}
+                        {mediaSuccess && <div className="success-banner mb-3">{mediaSuccess}</div>}
                         {matchMedia.length > 0 ? (
                             <div className="media-grid">
                                 {matchMedia.map((media) => (
@@ -501,6 +560,20 @@ const MatchDetail = () => {
                     </div>
                 )}
             </div>
+
+            {showMediaModal && (
+                <MediaUploadModal
+                    title="Maca Yeni Medya Ekle"
+                    busy={mediaSubmitting}
+                    error={mediaError}
+                    onClose={() => {
+                        if (!mediaSubmitting) {
+                            setShowMediaModal(false);
+                        }
+                    }}
+                    onSubmit={handleMatchMediaSubmit}
+                />
+            )}
         </div>
     );
 };
